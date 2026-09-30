@@ -268,6 +268,7 @@
           : true;
         if (!want) return;
         if (cb.onReset) cb.onReset();
+        if (typeof hideSummary === 'function') hideSummary();
       } catch (e) { console.warn('[MartingaleUI] reset:', e); }
     });
     csv.addEventListener('click', exportCsv);

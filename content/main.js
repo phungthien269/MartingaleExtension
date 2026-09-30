@@ -28,7 +28,8 @@
 
   function has(name) { return typeof root[name] === 'object' && root[name] !== null; }
 
-  let session = null;          // bản snapshot mới nhất biết được
+  let session = null;
+let suppressSummaryMs = 0;          // bản snapshot mới nhất biết được
   const engineOwned = has('MartingaleEngine');
 
   // ---------- tiện ích phiên (chỉ dùng khi engine vắng mặt) ----------
@@ -79,6 +80,8 @@
       if (has('MartingaleEngine') && typeof MartingaleEngine.resetForNewSession === 'function') {
         MartingaleEngine.resetForNewSession();
       }
+      suppressSummaryMs = Date.now() + 8000;
+      if (has('MartingaleUI') && typeof MartingaleUI.hideSummary === 'function') MartingaleUI.hideSummary();
       let bal = null;
       try { bal = MartingaleDOM.getBalance(); } catch (e) { bal = null; }
       if (has('MartingaleUI')) {
@@ -234,7 +237,7 @@
             }
             if (s.phase === 'ENDED') {
               refresh();
-              if (has('MartingaleUI')) MartingaleUI.showSummary(s);
+              if (Date.now() > suppressSummaryMs && has('MartingaleUI')) MartingaleUI.showSummary(s);
             }
           }
         } catch (e) { warn('watchEngine:', e); }
@@ -259,6 +262,15 @@
   // tick() của engine KHÔNG tự lên lịch và tự chống re-entry (cờ busy) —
   // main gọi an toàn mỗi 1.5s; kiểm tra has() mỗi nhịp nên engine xuất hiện
   // muộn (mock) vẫn được phủ.
+  // Chống điều tiết timer tab nền: giữ 1 Web Lock không bao giờ giải phóng.
+  // Chrome miễn "intensive throttling" (1 lần/phút sau 5 phút nền) cho trang giữ Web Lock —
+  // còn lại chỉ sàn 1 lần/giây, đủ cho nhịp tick 1.5s của engine.
+  try {
+    if (typeof navigator !== 'undefined' && navigator.locks && navigator.locks.request) {
+      navigator.locks.request('martingale-keepalive', function () { return new Promise(function () {}); });
+    }
+  } catch (eLock) { /* trình duyệt không hỗ trợ — vẫn chạy, chỉ chậm hơn khi nền */ }
+
   function watchEngineTick() {
     setInterval(function () {
       if (!has('MartingaleEngine')) return;
