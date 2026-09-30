@@ -248,6 +248,7 @@
       panel.classList.toggle('mg-only-collapsed');
       collapse.textContent = panel.classList.contains('mg-only-collapsed') ? '▸' : '▾';
     });
+    order.addEventListener('input', function () { betTouched = true; });
     bStart.addEventListener('click', onStartClick);
     bPause.addEventListener('click', function () { if (cb.onPause) cb.onPause(); });
     bResume.addEventListener('click', function () { if (cb.onResume) cb.onResume(); });
@@ -379,6 +380,8 @@
   }
 
   // ---------- cập nhật thống kê ----------
+  let betTouched = false; // true khi người dùng tự gõ mức lệnh gốc
+
   function update(session) {
     if (!session || !el.rounds) return;
     // cập nhật cục bộ (chỉ liveBalance) → gộp vào phiên đầy đủ đang có
@@ -395,8 +398,9 @@
     el.profit.className = 'v ' + (session.profit > 0 ? 'good' : (session.profit < 0 ? 'bad' : ''));
     if (el.note && session.note !== undefined) el.note.textContent = session.note;
     el.curBet.textContent = session.currentLevel == null ? '—' : fmtNum(session.currentLevel);
-    // Đồng bộ ô nhập mức gốc với phiên thật (sau reload): không ghi đè khi người dùng đang gõ.
-    if (el.order && session.baseLevel != null && document.activeElement !== el.order) {
+    // Đồng bộ ô nhập mức gốc CHỈ khi ô bị khóa (phiên đang chạy) hoặc người dùng
+    // chưa từng tự gõ — ô đang mở thì giữ nguyên giá trị người dùng nhập.
+    if (el.order && session.baseLevel != null && (el.order.disabled || !betTouched) && document.activeElement !== el.order) {
       const vOrder = String(Math.round(Number(session.baseLevel) * 100) / 100);
       if (el.order.value !== vOrder) el.order.value = vOrder;
     }

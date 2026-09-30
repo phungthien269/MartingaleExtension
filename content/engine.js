@@ -169,7 +169,7 @@
   function startNew(baseLevel, baseBalance) {
     stopToken = (stopToken || 0) + 1; // Start mới vô hiệu mọi tick/waitForResult của phiên cũ còn treo
     var bb = Math.max(0.01, round2(Number(baseLevel)) || 0.01);
-    var base = Number(baseBalance);
+    var base = (baseBalance == null) ? NaN : Number(baseBalance); // null/undefined → đọc DOM
     if (!isFinite(base)) {
       var d = dom();
       var b = (d && typeof d.getBalance === 'function') ? d.getBalance() : null;
@@ -597,12 +597,29 @@
   /** Reset an toàn (nút "Đặt lại" trên UI): hủy mọi chờ lệnh dang dở rồi ENDED.
    * tick() và waitForResult() kiểm tra stopToken nên không bao giờ đụng storage
    * hay DOM sau khi hàm này trả về — có thể startNew phiên mới ngay lập tức. */
-  function resetForNewSession() {
+  function resetForNewSession(opts) {
     stopToken = (stopToken || 0) + 1;
-    if (!session) return;
-    session.orderPlaced = false;
-    session.pendingOrder = null;
-    endSession('Đã đặt lại thủ công — phiên mới sẵn sàng.');
+    var o = opts || {};
+    var prevBaseBet = session ? session.baseLevel : null;
+    var prevBaseBal = session ? session.baseBalance : null;
+    if (session) {
+      session.orderPlaced = false;
+      session.pendingOrder = null;
+      endSession('Đã đặt lại thủ công — phiên mới sẵn sàng.');
+    }
+    // Phiên chờ mới: số dư gốc = số dư HIỆN TẠI (nếu đọc được), mức lệnh gốc giữ
+    // lại từ phiên cũ để người dùng chỉnh rồi bấm Bắt đầu.
+    var fresh = freshSession();
+    var bb = (o.baseLevel != null) ? Number(o.baseLevel) : prevBaseBet;
+    fresh.baseLevel = Math.max(0.01, round2(isFinite(bb) ? bb : 0.01));
+    var base = (typeof o.baseBalance === 'number' && isFinite(o.baseBalance)) ? o.baseBalance : prevBaseBal;
+    if (isFinite(base)) fresh.baseBalance = round2(base);
+    fresh.phase = 'IDLE';
+    fresh.note = 'Đã đặt lại — số dư gốc = số dư hiện tại. Chỉnh mức lệnh gốc rồi bấm Bắt đầu.';
+    session = fresh;
+    persist();
+    notify();
+    return session;
   }
 
   // ---- API công khai ----

@@ -77,16 +77,18 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
   // mở khóa ô nhập mức lệnh gốc. Người dùng gõ mức mới rồi bấm "Bắt đầu" = phiên mới.
   function uiReset() {
     try {
+      let balNow = null;
+      try { balNow = MartingaleDOM.getBalance(); } catch (e) { balNow = null; }
       if (has('MartingaleEngine') && typeof MartingaleEngine.resetForNewSession === 'function') {
-        MartingaleEngine.resetForNewSession();
+        MartingaleEngine.resetForNewSession({ baseBalance: (typeof balNow === 'number' && isFinite(balNow)) ? Math.round(balNow * 100) / 100 : null });
       }
       suppressSummaryMs = Date.now() + 8000;
       if (has('MartingaleUI') && typeof MartingaleUI.hideSummary === 'function') MartingaleUI.hideSummary();
       let bal = null;
       try { bal = MartingaleDOM.getBalance(); } catch (e) { bal = null; }
       if (has('MartingaleUI')) {
-        if (typeof MartingaleUI.setPhase === 'function') MartingaleUI.setPhase('ENDED');
-        if (typeof MartingaleUI.update === 'function' && bal != null) MartingaleUI.update({ phase: 'ENDED', balance: bal });
+        if (typeof MartingaleUI.setPhase === 'function') MartingaleUI.setPhase('IDLE');
+        if (typeof MartingaleUI.update === 'function') MartingaleUI.update({ note: 'Đã đặt lại — chỉnh mức lệnh gốc rồi bấm Bắt đầu.' });
       }
       log('Đặt lại: phiên cũ kết thúc, số dư đọc lại =', bal, '— chờ CEO nhập mức lệnh gốc mới.');
     } catch (e) { warn('uiReset:', e); }
