@@ -201,7 +201,9 @@
     const bal = readBalanceFromDom();
     if (bal !== null) {
       balanceMissStreak = 0;
+      const balChanged = lastBalance === null || Math.abs(bal - lastBalance) > 0.004;
       lastBalance = bal;
+      if (balChanged) fireBalance(bal);
       if (mode !== 'AUTO') {
         mode = 'AUTO';
         manualBalance = null;
@@ -422,6 +424,21 @@
     return list;
   }
 
+  // ---- callback số dư real-time ----
+  let balCbs = [];
+  function fireBalance(b) {
+    for (let i = 0; i < balCbs.length; i++) {
+      try { balCbs[i](b); } catch (e) { warn('onBalance callback lỗi:', e && e.message); }
+    }
+  }
+  /** Đăng ký nhận số dư ngay khi DOM thay đổi (poll + MutationObserver). */
+  function onBalance(cb) {
+    if (typeof cb !== 'function') return function () {};
+    balCbs.push(cb);
+    if (lastBalance !== null) { try { cb(lastBalance); } catch (e) { /* bỏ qua */ } }
+    return function () { balCbs = balCbs.filter(function (c) { return c !== cb; }); };
+  }
+
   /** Đăng ký callback khi mất bám số dư trên DOM (bật MANUAL) / bám lại (reason=null). */
   function onManualBalance(cb) {
     if (typeof cb !== 'function') return function () {};
@@ -466,6 +483,7 @@
     placeOrder,
     isUiReady,
     getResults,
+    onBalance,
     onManualBalance,
     setManualBalance,
     getMode,

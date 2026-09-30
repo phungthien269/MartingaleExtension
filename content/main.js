@@ -206,6 +206,15 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
     } catch (e) { warn('onCfChange:', e); }
   }
 
+  // ---------- số dư real-time: DOM bắn mỗi khi trang đổi số dư ----------
+  function onLiveBalance(bal) {
+    try {
+      if (typeof bal !== 'number' || !isFinite(bal)) return;
+      if (has('MartingaleEngine') && typeof MartingaleEngine.setLiveBalance === 'function') MartingaleEngine.setLiveBalance(bal);
+      if (has('MartingaleUI') && typeof MartingaleUI.update === 'function') MartingaleUI.update({ liveBalance: bal });
+    } catch (e) { warn('onLiveBalance:', e); }
+  }
+
   // ---------- DOM.manual → UI (quét hụt số dư 3 lần liên tiếp) ----------
   function onDomManual() {
     try { if (has('MartingaleUI')) MartingaleUI.setManual(true); } catch (e) { warn('onDomManual:', e); }
@@ -222,7 +231,9 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
           if (!s) return;
           const prevRounds = session ? session.rounds : -1;
           const prevPhase = session ? session.phase : null;
+          const prevNote = session ? session.note : undefined;
           session = s;
+          if (s.note !== prevNote && has('MartingaleUI') && typeof MartingaleUI.update === 'function') MartingaleUI.update({ note: s.note });
           if (s.rounds !== prevRounds) {
             refresh(); // thống kê + phase mới nhất
             // đẩy điểm chart nếu engine chưa kịp đẩy (tránh trùng: so sánh nghiêm < )
@@ -301,6 +312,7 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
     if (has('MartingaleDOM')) {
       try {
         if (typeof MartingaleDOM.onManualBalance === 'function') MartingaleDOM.onManualBalance(onDomManual);
+    if (typeof MartingaleDOM.onBalance === 'function') MartingaleDOM.onBalance(onLiveBalance);
         MartingaleDOM.init({ pollMs: 1000 });
       } catch (e) { warn('DOM.init:', e); }
     }

@@ -195,10 +195,11 @@
     const stats = h('div');
     stats.id = 'mg-stats';
     stats.innerHTML =
+      '<div id="emp-note" style="grid-column:1/-1;color:#93a0b8;font-size:11px;min-height:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">—</div>' +
       cell('Vòng', 'st-rounds') + cell('Thắng', 'st-wins') +
       cell('Thua', 'st-losses') + cell('Chuỗi thua hiện tại', 'st-streak') +
       cell('Chuỗi thua dài nhất', 'st-maxstreak') + cell('Lời / Lỗ', 'st-profit') +
-      cell('Lệnh hiện tại', 'st-order') + cell('Số dư', 'st-balance');
+      cell('Số dư gốc', 'st-basebal') + cell('Lệnh hiện tại', 'st-order') + cell('Số dư', 'st-balance');
     function cell(k, id) {
       return '<div class="mg-cell"><div class="k">' + k + '</div><div class="v" id="' + id + '">—</div></div>';
     }
@@ -233,10 +234,11 @@
       manual: manual, manualInp: manual.querySelector('#mg-manual-inp'),
       manualSave: manual.querySelector('#mg-manual-save'),
       order: order, bStart: bStart, bPause: bPause, bResume: bResume,
+      note: stats.querySelector('#emp-note'),
       rounds: stats.querySelector('#st-rounds'), wins: stats.querySelector('#st-wins'),
       losses: stats.querySelector('#st-losses'), streak: stats.querySelector('#st-streak'),
       maxStreak: stats.querySelector('#st-maxstreak'), profit: stats.querySelector('#st-profit'),
-      curBet: stats.querySelector('#st-order'), balance: stats.querySelector('#st-balance'),
+      baseBal: stats.querySelector('#st-basebal'), curBet: stats.querySelector('#st-order'), balance: stats.querySelector('#st-balance'),
       csv: csv, err: err, sumback: sumback, sum: sum
     });
 
@@ -379,6 +381,10 @@
   // ---------- cập nhật thống kê ----------
   function update(session) {
     if (!session || !el.rounds) return;
+    // cập nhật cục bộ (chỉ liveBalance) → gộp vào phiên đầy đủ đang có
+    if (latest && session.rounds === undefined && (session.liveBalance !== undefined || session.note !== undefined)) {
+      session = Object.assign({}, latest, session);
+    }
     latest = session;
     el.rounds.textContent = fmtNum(session.rounds);
     el.wins.textContent = fmtNum(session.wins);
@@ -387,6 +393,7 @@
     el.maxStreak.textContent = fmtNum(session.maxLossStreak);
     el.profit.textContent = fmtProfit(session.profit);
     el.profit.className = 'v ' + (session.profit > 0 ? 'good' : (session.profit < 0 ? 'bad' : ''));
+    if (el.note && session.note !== undefined) el.note.textContent = session.note;
     el.curBet.textContent = session.currentLevel == null ? '—' : fmtNum(session.currentLevel);
     // Đồng bộ ô nhập mức gốc với phiên thật (sau reload): không ghi đè khi người dùng đang gõ.
     if (el.order && session.baseLevel != null && document.activeElement !== el.order) {
@@ -394,7 +401,11 @@
       if (el.order.value !== vOrder) el.order.value = vOrder;
     }
     const hb = session.history && session.history.length ? session.history[session.history.length - 1] : null;
-    el.balance.textContent = hb ? fmtNum(hb.balance) : (session.baseBalance == null ? '—' : fmtNum(session.baseBalance));
+    const liveBal = (typeof session.liveBalance === 'number' && isFinite(session.liveBalance))
+      ? session.liveBalance
+      : (hb ? hb.balance : session.baseBalance);
+    el.balance.textContent = liveBal == null ? '—' : fmtNum(liveBal);
+    el.baseBal.textContent = session.baseBalance == null ? '—' : fmtNum(session.baseBalance);
     if (session.phase) setPhase(session.phase);
   }
 

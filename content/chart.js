@@ -39,7 +39,8 @@
     autoFit: true,      // true = luôn vẽ trọn dữ liệu
     dragOn: false, dragX: 0,
     ro: null,           // ResizeObserver
-    raf: 0
+    raf: 0,
+    hover: null, tip: null, geom: null
   };
 
   // ---------- tiện ích ----------
@@ -53,8 +54,8 @@
   }
 
   function fmtNum(n) {
-    try { return new Intl.NumberFormat('vi-VN').format(Math.round(n)); }
-    catch (e) { return String(Math.round(n)); }
+    try { return new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 }).format(Number(n) || 0); }
+    catch (e) { return String(Math.round((Number(n) || 0) * 100) / 100); }
   }
 
   function niceStep(range, target) {
@@ -90,7 +91,8 @@
       '.mg-chart-btn:hover{background:#253049}',
       '.mg-chart-box{position:relative;flex:1;background:#10141d;border:1px solid #2a3245;border-radius:8px;overflow:hidden}',
       '.mg-chart-box canvas{position:absolute;top:0;left:0;width:100%;height:100%;display:block;cursor:grab}',
-      '.mg-chart-box canvas.mg-dragging{cursor:grabbing}'
+      '.mg-chart-box canvas.mg-dragging{cursor:grabbing}',
+      '.mg-chart-tip{position:absolute;pointer-events:none;background:#0d1117;border:1px solid #3b82f6;border-radius:6px;color:#e8ecf4;font:12px system-ui,sans-serif;padding:4px 8px;display:none;white-space:nowrap;z-index:5;box-shadow:0 2px 8px rgba(0,0,0,.45)}',
     ].join('\n');
     (document.head || document.documentElement).appendChild(tag);
   }
@@ -133,6 +135,15 @@
     st.wrap = wrap; st.box = box; st.canvas = canvas;
     st.ctx = canvas.getContext('2d');
 
+    const tip = document.createElement('div');
+    tip.className = 'mg-chart-tip';
+    box.appendChild(tip);
+    st.tip = tip;
+    st.hover = null;
+    st.geom = null;
+    canvas.addEventListener('pointermove', onPointerMove);
+    canvas.addEventListener('pointerleave', onPointerLeave);
+
     canvas.addEventListener('wheel', onWheel, { passive: false });
     canvas.addEventListener('mousedown', function (e) {
       st.dragOn = true;
@@ -165,6 +176,46 @@
   }
 
   function onWinResize() { resize(); }
+
+  // ---------- hover: tìm điểm gần chuột, hiện tooltip số dư chính xác ----------
+  function hideTip() {
+    if (st.tip) st.tip.style.display = 'none';
+  }
+  function showTip(p, g) {
+    if (!st.tip) return;
+    st.tip.innerHTML = '<b>' + fmtNum(p.balance) + '</b> · ' + fmtTime(p.t, true);
+    st.tip.style.display = 'block';
+    const tw = st.tip.offsetWidth || 60;
+    const th = st.tip.offsetHeight || 24;
+    let left = g.xOf(p.t) + 12;
+    if (left + tw > st.cssW - 4) left = g.xOf(p.t) - tw - 12;
+    if (left < 4) left = 4;
+    let top = g.yOf(p.balance) - th - 10;
+    if (top < 4) top = g.yOf(p.balance) + 12;
+    st.tip.style.left = Math.round(left) + 'px';
+    st.tip.style.top = Math.round(top) + 'px';
+  }
+  function onPointerMove(e) {
+    const g = st.geom;
+    if (!g || !g.pts.length || !st.canvas) { st.hover = null; hideTip(); return; }
+    const rect = st.canvas.getBoundingClientRect();
+    const mx = e.clientX - rect.left;
+    const my = e.clientY - rect.top;
+    let best = null, bestD = 50 * 50;
+    for (let i = 0; i < g.pts.length; i++) {
+      const dx = g.xOf(g.pts[i].t) - mx, dy = g.yOf(g.pts[i].balance) - my;
+      const dd = dx * dx + dy * dy;
+      if (dd <= bestD) { bestD = dd; best = g.pts[i]; }
+    }
+    if (!best) { if (st.hover) { st.hover = null; schedule(); } hideTip(); return; }
+    st.hover = { t: best.t, balance: best.balance };
+    showTip(best, g);
+    schedule();
+  }
+  function onPointerLeave() {
+    if (st.hover) { st.hover = null; schedule(); }
+    hideTip();
+  }
 
   function onWheel(e) {
     e.preventDefault();
@@ -312,6 +363,7 @@
     const plotW = st.cssW - PAD.left - PAD.right;
     const plotH = st.cssH - PAD.top - PAD.bottom;
     if (!st.data.length || plotW < 20 || plotH < 20) {
+      st.geom = null;
       drawPlaceholder(ctx, 'Chưa có dữ liệu số dư');
       return;
     }
@@ -327,6 +379,7 @@
       if (d[i].t >= v.t0 && d[i].t <= v.t1) pts.push(d[i]);
     }
     if (!pts.length) {
+      st.geom = null;
       drawPlaceholder(ctx, 'Ngoài vùng dữ liệu — nhấp đôi chuột để vừa khung');
       return;
     }
@@ -344,6 +397,7 @@
 
     function xOf(t) { return PAD.left + ((t - v.t0) / span) * plotW; }
     function yOf(b) { return PAD.top + (1 - (b - bMin) / (bMax - bMin)) * plotH; }
+    st.geom = { pts: pts, xOf: xOf, yOf: yOf };
 
     // lưới ngang + nhãn số dư (bên phải)
     ctx.lineWidth = 1;
@@ -410,6 +464,19 @@
     ctx.strokeStyle = COLOR.bg;
     ctx.lineWidth = 1.5;
     ctx.stroke();
+
+    // điểm đang hover: vạch dẫn 2 trục + vòng sáng
+    if (st.hover) {
+      const hx = xOf(st.hover.t), hy = yOf(st.hover.balance);
+      ctx.strokeStyle = 'rgba(255,209,102,0.45)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath(); ctx.moveTo(hx, PAD.top); ctx.lineTo(hx, PAD.top + plotH); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(PAD.left, hy); ctx.lineTo(PAD.left + plotW, hy); ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.beginPath(); ctx.arc(hx, hy, 6, 0, Math.PI * 2);
+      ctx.strokeStyle = COLOR.dot; ctx.lineWidth = 2; ctx.stroke();
+    }
   }
 
   root.MartingaleChart = {

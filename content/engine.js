@@ -51,6 +51,7 @@
   var POLL_RESULT_MS = 1500;      // chu kỳ hỏi kết quả sau khi đặt lệnh
   var RESULT_TIMEOUT_MS = 120000; // chờ kết quả tối đa 120s
   var MIN_RESULT_DELAY_MS = 3000; // không nhận kết quả trước 3s kể từ lúc lệnh
+  var RESULT_SOFT_TIMEOUT_MS = 25000; // không thấy dịch chuyển → đối soát bằng biến thiên số dư
   var RESTORE_TIMEOUT_MS = 120000;// chờ UI sẵn sàng sau reload tối đa 120s
   var RESTORE_POLL_MS = 1000;     // chu kỳ kiểm tra UI khi restore
   var MAX_CHART_POINTS = 10000;   // trần điểm chart (chống phình storage)
@@ -257,6 +258,13 @@
   // lệnh, kết hợp lastCount (session.history.length lúc đặt lệnh) để không
   // bao giờ ghi 2 vòng cùng index.
   // BLOCKED giữa chừng → aborted (giữ pending, đối soát sau khi hết chặn).
+  /** Ghi chú trạng thái cho hàng "Ghi chú" trên dashboard — chỉ ghi + lưu khi THAY ĐỔI. */
+  function setNote(txt) {
+    if (!session || session.note === txt) return;
+    session.note = txt;
+    persist();
+  }
+
   function waitForResult(pending) {
     return new Promise(function (resolve) {
       var baseline = pending.fp || '';
@@ -279,6 +287,17 @@
         if (shifted && elapsed >= MIN_RESULT_DELAY_MS) {
           resolve({ aborted: false, result: head, timeout: false });
           return;
+        }
+        if (elapsed >= RESULT_SOFT_TIMEOUT_MS && pending.bal0 != null) {
+          var dSoft = dom();
+          var balSoft = (dSoft && typeof dSoft.getBalance === 'function') ? dSoft.getBalance() : null;
+          if (typeof balSoft !== 'number' || !isFinite(balSoft)) balSoft = liveBalance;
+          if (typeof balSoft === 'number' && isFinite(balSoft)) {
+            var deltaSoft = Math.round((balSoft - pending.bal0) * 100) / 100;
+            if (Math.abs(deltaSoft - pending.order) < 0.005) { resolve({ aborted: false, result: pending.side, soft: true }); return; }
+            if (Math.abs(deltaSoft + pending.order) < 0.005) { resolve({ aborted: false, result: (pending.side === 'T' ? 'CT' : 'T'), soft: true }); return; }
+          }
+          setNote('Không thấy kết quả trên trang — đối soát bằng biến thiên số dư…');
         }
         if (elapsed >= RESULT_TIMEOUT_MS) {
           if (shifted) {
@@ -414,7 +433,8 @@
     // tay top-3 kết quả — cả hai dùng để chống ghi trùng vòng (NOTE #1).
     session.pendingOrder = {
       side: side, order: order, t: Date.now(),
-      lastCount: countRounds(), fp: resultsFingerprint(3)
+      lastCount: countRounds(), fp: resultsFingerprint(3),
+      bal0: (typeof balNow === 'number' && isFinite(balNow)) ? round2(balNow) : null
     };
     await persist(); // NGAY trước khi chạm UI — sống sót reload bất cứ lúc nào
     notify();
@@ -443,11 +463,13 @@
         log('Đặt lệnh chưa được (' + failReason + ') lần',
           session.placeFailCount, '— thử lại ở tick sau');
       }
+      setNote('Chưa đặt được (' + failReason + ') — sẽ thử lại ở nhịp sau…');
       await persist();
       notify();
       return;
     }
     session.placeFailCount = 0;
+    setNote('Đã đặt ' + order + ' vào ' + side + ' — chờ kết quả…');
 
     var pending = session.pendingOrder;
     var wr = await waitForResult(pending);
@@ -475,12 +497,13 @@
     try {
       var c = cf();
       if (c && typeof c.isBlocked === 'function' && c.isBlocked()) {
+        setNote('Trang bị chặn — tạm dừng…');
         notifyBlocked();
         if (myToken !== stopToken) return;
         return; // đang bị chặn — không đặt lệnh mới
       }
       var d = dom();
-      if (d && typeof d.isUiReady === 'function' && !d.isUiReady()) return;
+      if (d && typeof d.isUiReady === 'function' && !d.isUiReady()) { setNote('Chờ giao diện trang sẵn sàng…'); return; }
       if (myToken !== stopToken) return;
 
       if (session.orderPlaced) {
