@@ -1,0 +1,44 @@
+{
+  "manifest_version": 3,
+  "name": "Martingale Extension",
+  "version": "1.0.0",
+  "description": "Bảng điều khiển tự động hóa chuỗi Martingale trên ứng dụng web số thực-time — Chrome MV3, vanilla JS.",
+  "permissions": [
+    "storage"
+  ],
+  "host_permissions": [
+    "https://example.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://example.com/*"
+      ],
+      "js": [
+        "content/rng.js",
+        "content/storage.js",
+        "content/dom.js",
+        "content/cf-watch.js",
+        "content/stats.js",
+        "content/chart.js",
+        "content/engine.js",
+        "content/ui.js",
+        "content/main.js",
+        "dev/mock-bridge.js"
+      ],
+      "run_at": "document_idle"
+    }
+  ],
+  "commands": {
+    "toggle-dashboard": {
+      "suggested_key": {
+        "default": "Alt+Shift+X",
+        "mac": "Command+Shift+X"
+      },
+      "description": "Hiện/ẩn dashboard Martingale Panel"
+    }
+  },
+  "background": {
+    "service_worker": "background.js"
+  }
+}
