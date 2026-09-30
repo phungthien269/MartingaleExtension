@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Martingale Extension",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "description": "Bảng điều khiển tự động hóa chuỗi Martingale trên ứng dụng web số thực-time — Chrome MV3, vanilla JS.",
   "permissions": [
     "storage"

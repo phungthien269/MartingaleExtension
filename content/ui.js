@@ -384,8 +384,13 @@
 
   function update(session) {
     if (!session || !el.rounds) return;
-    // cập nhật cục bộ (chỉ liveBalance) → gộp vào phiên đầy đủ đang có
-    if (latest && session.rounds === undefined && (session.liveBalance !== undefined || session.note !== undefined)) {
+    // cập nhật cục bộ (chỉ liveBalance/note) → gộp vào phiên đầy đủ đang có.
+    // QUAN TRỌNG: bản cục bộ KHÔNG được phép đổi phase/nút bấm — phase cũ trong
+    // latest có thể là RUNNING/ENDED đã qua, đè mất trạng thái mới (ví dụ IDLE
+    // sau khi Đặt lại) khiến ô nhập khóa và nút Bắt đầu bấm không được.
+    const isPartial = latest && session.rounds === undefined &&
+      (session.liveBalance !== undefined || session.note !== undefined);
+    if (isPartial) {
       session = Object.assign({}, latest, session);
     }
     latest = session;
@@ -410,7 +415,7 @@
       : (hb ? hb.balance : session.baseBalance);
     el.balance.textContent = liveBal == null ? '—' : fmtNum(liveBal);
     el.baseBal.textContent = session.baseBalance == null ? '—' : fmtNum(session.baseBalance);
-    if (session.phase) setPhase(session.phase);
+    if (session.phase && !isPartial) setPhase(session.phase);
   }
 
   // ---------- xuất CSV ----------

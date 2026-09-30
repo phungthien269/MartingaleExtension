@@ -80,15 +80,17 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
       let balNow = null;
       try { balNow = MartingaleDOM.getBalance(); } catch (e) { balNow = null; }
       if (has('MartingaleEngine') && typeof MartingaleEngine.resetForNewSession === 'function') {
-        MartingaleEngine.resetForNewSession({ baseBalance: (typeof balNow === 'number' && isFinite(balNow)) ? Math.round(balNow * 100) / 100 : null });
+        const fresh = MartingaleEngine.resetForNewSession({ baseBalance: (typeof balNow === 'number' && isFinite(balNow)) ? Math.round(balNow * 100) / 100 : null });
+        // đẩy thẳng phiên chờ mới lên UI: số dư gốc = số dư hiện tại, thống kê về 0
+        if (has('MartingaleUI') && typeof MartingaleUI.update === 'function' && fresh) MartingaleUI.update(fresh);
       }
       suppressSummaryMs = Date.now() + 8000;
       if (has('MartingaleUI') && typeof MartingaleUI.hideSummary === 'function') MartingaleUI.hideSummary();
       let bal = null;
       try { bal = MartingaleDOM.getBalance(); } catch (e) { bal = null; }
       if (has('MartingaleUI')) {
-        if (typeof MartingaleUI.setPhase === 'function') MartingaleUI.setPhase('IDLE');
         if (typeof MartingaleUI.update === 'function') MartingaleUI.update({ note: 'Đã đặt lại — chỉnh mức lệnh gốc rồi bấm Bắt đầu.' });
+        if (typeof MartingaleUI.setPhase === 'function') MartingaleUI.setPhase('IDLE'); // gọi CUỐI cùng
       }
       log('Đặt lại: phiên cũ kết thúc, số dư đọc lại =', bal, '— chờ CEO nhập mức lệnh gốc mới.');
     } catch (e) { warn('uiReset:', e); }
