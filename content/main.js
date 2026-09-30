@@ -39,7 +39,8 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
       : { baseLevel: 100, phase: 'IDLE', wasRunningBeforeBlock: false, baseBalance: null,
           currentLevel: null, orderPlaced: false, rounds: 0, wins: 0, losses: 0,
           currentLossStreak: 0, maxLossStreak: 0, profit: 0, history: [], chart: [] };
-    s.baseLevel = Math.max(0.01, Math.round((Number(baseLevel) || 0) * 100) / 100);
+    s.startedAt = Date.now(); // mốc thời gian bắt đầu phiên
+        s.baseLevel = Math.max(0.01, Math.round((Number(baseLevel) || 0) * 100) / 100);
     s.baseBalance = Math.round((Number(baseBalance) || 0) * 100) / 100;
     return s;
   }

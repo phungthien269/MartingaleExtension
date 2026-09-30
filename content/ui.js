@@ -49,9 +49,29 @@
     });
   }
   function p2(n) { return n < 10 ? '0' + n : String(n); }
-  function fmtClock(t) {
-    const d = new Date(t);
-    return p2(d.getHours()) + ':' + p2(d.getMinutes()) + ':' + p2(d.getSeconds());
+  
+  // Giờ Việt Nam (GMT+7) cố định — không phụ thuộc múi giờ máy/web.
+  const TZ_VN = 'Asia/Ho_Chi_Minh';
+  function tzParts(ms, withSeconds) {
+    const d = new Date(Number(ms));
+    try {
+      const parts = new Intl.DateTimeFormat('vi-VN', {
+        timeZone: TZ_VN, hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hourCycle: 'h23'
+      }).formatToParts(d);
+      const get = function (t) { const p = parts.find(function (x) { return x.type === t; }); return p ? p.value : '00'; };
+      let s = get('hour') + ':' + get('minute');
+      if (withSeconds) s += ':' + get('second');
+      return s;
+    } catch (e) { /* rơi xuống fallback giờ máy bên dưới */ }
+    const p2t = function (n) { return n < 10 ? '0' + n : String(n); };
+    let s = p2t(d.getHours()) + ':' + p2t(d.getMinutes());
+    if (withSeconds) s += ':' + p2t(d.getSeconds());
+    return s;
+  }
+
+  function fmtClock(ms, withSeconds) {
+    return tzParts(ms, withSeconds !== false);
   }
 
   // ---------- style ----------
@@ -199,7 +219,7 @@
       cell('Vòng', 'st-rounds') + cell('Thắng', 'st-wins') +
       cell('Thua', 'st-losses') + cell('Chuỗi thua hiện tại', 'st-streak') +
       cell('Chuỗi thua dài nhất', 'st-maxstreak') + cell('Lời / Lỗ', 'st-profit') +
-      cell('Số dư gốc', 'st-basebal') + cell('Lệnh hiện tại', 'st-order') + cell('Số dư', 'st-balance');
+      cell('Số dư gốc', 'st-basebal') + cell('Bắt đầu lúc', 'st-start') + cell('Lệnh hiện tại', 'st-order') + cell('Số dư', 'st-balance');
     function cell(k, id) {
       return '<div class="mg-cell"><div class="k">' + k + '</div><div class="v" id="' + id + '">—</div></div>';
     }
@@ -238,7 +258,8 @@
       rounds: stats.querySelector('#st-rounds'), wins: stats.querySelector('#st-wins'),
       losses: stats.querySelector('#st-losses'), streak: stats.querySelector('#st-streak'),
       maxStreak: stats.querySelector('#st-maxstreak'), profit: stats.querySelector('#st-profit'),
-      baseBal: stats.querySelector('#st-basebal'), curBet: stats.querySelector('#st-order'), balance: stats.querySelector('#st-balance'),
+      baseBal: stats.querySelector('#st-basebal'),
+      startAt: stats.querySelector('#st-start'), curBet: stats.querySelector('#st-order'), balance: stats.querySelector('#st-balance'),
       csv: csv, err: err, sumback: sumback, sum: sum
     });
 
@@ -415,6 +436,7 @@
       : (hb ? hb.balance : session.baseBalance);
     el.balance.textContent = liveBal == null ? '—' : fmtNum(liveBal);
     el.baseBal.textContent = session.baseBalance == null ? '—' : fmtNum(session.baseBalance);
+    if (el.startAt) el.startAt.textContent = session.startedAt ? fmtClock(session.startedAt, true) : '—';
     if (session.phase && !isPartial) setPhase(session.phase);
   }
 

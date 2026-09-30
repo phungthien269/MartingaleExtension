@@ -154,6 +154,7 @@
         : (typeof s.baseBalance === 'number' ? s.baseBalance : null));
     return {
       endedAt: s.endedAt || Date.now(),
+      startedAt: (typeof s.startedAt === 'number') ? s.startedAt : null,
       reason: reason || s.stopReason || null,
       baseBalance: typeof s.baseBalance === 'number' ? s.baseBalance : null,
       finalBalance: finalBal,
@@ -181,6 +182,7 @@
     session.baseLevel = bb;
     session.baseBalance = base;
     session.phase = 'RUNNING';
+    session.startedAt = Date.now(); // mốc thời gian bắt đầu phiên
     session.orderPlaced = false;
     session.pendingOrder = null;
     summary = null;
@@ -614,6 +616,7 @@
     fresh.baseLevel = Math.max(0.01, round2(isFinite(bb) ? bb : 0.01));
     var base = (typeof o.baseBalance === 'number' && isFinite(o.baseBalance)) ? o.baseBalance : prevBaseBal;
     if (isFinite(base)) fresh.baseBalance = round2(base);
+    fresh.startedAt = null; // chưa bắt đầu — sẽ chốt khi bấm Bắt đầu
     fresh.phase = 'IDLE';
     fresh.note = 'Đã đặt lại — số dư gốc = số dư hiện tại. Chỉnh mức lệnh gốc rồi bấm Bắt đầu.';
     session = fresh;
