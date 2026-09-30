@@ -388,6 +388,11 @@
     el.profit.textContent = fmtProfit(session.profit);
     el.profit.className = 'v ' + (session.profit > 0 ? 'good' : (session.profit < 0 ? 'bad' : ''));
     el.curBet.textContent = session.currentLevel == null ? '—' : fmtNum(session.currentLevel);
+    // Đồng bộ ô nhập mức gốc với phiên thật (sau reload): không ghi đè khi người dùng đang gõ.
+    if (el.order && session.baseLevel != null && document.activeElement !== el.order) {
+      const vOrder = String(Math.round(Number(session.baseLevel) * 100) / 100);
+      if (el.order.value !== vOrder) el.order.value = vOrder;
+    }
     const hb = session.history && session.history.length ? session.history[session.history.length - 1] : null;
     el.balance.textContent = hb ? fmtNum(hb.balance) : (session.baseBalance == null ? '—' : fmtNum(session.baseBalance));
     if (session.phase) setPhase(session.phase);
