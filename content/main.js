@@ -329,6 +329,7 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
           onStart: uiStart,
           onPause: uiPause,
           onResume: uiResume,
+          onReset: uiReset,
           onManualBalance: uiManualBalance
         });
       } catch (e) { warn('UI.mount:', e); }
