@@ -264,6 +264,19 @@
     });
 
     // ---- sự kiện ----
+    // chip phiên bản — để người dùng tự kiểm tra tab đang chạy code bản nào
+    try {
+      const ver = (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.getManifest)
+        ? ('v' + chrome.runtime.getManifest().version) : '';
+      if (ver && el.phase && el.phase.parentNode) {
+        const chip = document.createElement('span');
+        chip.id = 'mg-ver';
+        chip.textContent = ver;
+        chip.style.cssText = 'font-size:10px;color:#8b93a7;margin-left:6px;white-space:nowrap';
+        chip.title = 'Phiên bản extension đang chạy trên tab này';
+        el.phase.parentNode.insertBefore(chip, el.phase.nextSibling);
+      }
+    } catch (e0) { /* bỏ qua */ }
     drag.addEventListener('pointerdown', onDragStart);
     collapse.addEventListener('click', function () {
       panel.classList.toggle('mg-only-collapsed');
@@ -285,12 +298,20 @@
       }
     } catch (e0) { /* mock/env không có chrome.runtime */ }
 
+    // Xác nhận 2 lần bấm IN-PANEL — không dùng window.confirm vì trang có thể
+    // chặn hộp thoại (trả false IM LẶNG) khiến nút Đặt lại thành xác chết.
+    let resetArmed = 0;
     bReset.addEventListener('click', function () {
       try {
-        const want = typeof window !== 'undefined' && window.confirm
-          ? window.confirm('Đặt lại phiên? Phiên hiện tại sẽ kết thúc, đọc lại số dư và cho nhập mức lệnh gốc mới.')
-          : true;
-        if (!want) return;
+        const now = Date.now();
+        if (now > resetArmed) {
+          resetArmed = now + 3000;
+          bReset.textContent = 'Bấm lần nữa để xác nhận';
+          setTimeout(function () { bReset.textContent = 'Đặt lại'; }, 3000);
+          return;
+        }
+        resetArmed = 0;
+        bReset.textContent = 'Đặt lại';
         if (cb.onReset) cb.onReset();
         if (typeof hideSummary === 'function') hideSummary();
       } catch (e) { console.warn('[MartingaleUI] reset:', e); }
