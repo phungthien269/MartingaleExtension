@@ -77,25 +77,45 @@ let suppressSummaryMs = 0;          // bản snapshot mới nhất biết đư�
   // Nút "Đặt lại": hủy phiên hiện tại sạch (hết token các tick cũ), đọc lại số dư,
   // mở khóa ô nhập mức lệnh gốc. Người dùng gõ mức mới rồi bấm "Bắt đầu" = phiên mới.
   function uiReset() {
+    // Mở khóa UI NGAY LẬP TỨC — mọi bước nặng chạy sau, từng bước một try/catch
+    // riêng: 1 bước nổ không được phép chặn việc mở khóa nút/ô nhập.
+    const steps = [];
     try {
-      let balNow = null;
-      try { balNow = MartingaleDOM.getBalance(); } catch (e) { balNow = null; }
+      if (has('MartingaleUI')) {
+        if (typeof MartingaleUI.setPhase === 'function') { MartingaleUI.setPhase('IDLE'); steps.push('phase=IDLE'); }
+        if (typeof MartingaleUI.update === 'function') MartingaleUI.update({ note: 'Đã nhận lệnh Đặt lại — đang đọc số dư…' });
+      }
+    } catch (eUI) { warn('uiReset.unlock:', eUI); steps.push('UI-ERROR:' + (eUI && eUI.message)); }
+
+    let balNow = null;
+    try { balNow = MartingaleDOM.getBalance(); } catch (e0) { balNow = null; }
+
+    try {
       if (has('MartingaleEngine') && typeof MartingaleEngine.resetForNewSession === 'function') {
         const fresh = MartingaleEngine.resetForNewSession({ baseBalance: (typeof balNow === 'number' && isFinite(balNow)) ? Math.round(balNow * 100) / 100 : null });
-        // đẩy thẳng phiên chờ mới lên UI: số dư gốc = số dư hiện tại, thống kê về 0
+        steps.push('engine=OK');
         if (has('MartingaleUI') && typeof MartingaleUI.update === 'function' && fresh) MartingaleUI.update(fresh);
+      } else {
+        steps.push('ENGINE-MISSING');
       }
-      suppressSummaryMs = Date.now() + 8000;
-      if (has('MartingaleUI') && typeof MartingaleUI.hideSummary === 'function') MartingaleUI.hideSummary();
-      let bal = null;
-      try { bal = MartingaleDOM.getBalance(); } catch (e) { bal = null; }
+    } catch (eEng) { warn('uiReset.engine:', eEng); steps.push('ENGINE-ERROR:' + (eEng && eEng.message)); }
+
+    suppressSummaryMs = Date.now() + 8000;
+    try {
       if (has('MartingaleUI')) {
-        if (typeof MartingaleUI.update === 'function') MartingaleUI.update({ note: 'Đã đặt lại — chỉnh mức lệnh gốc rồi bấm Bắt đầu.' });
+        if (typeof MartingaleUI.hideSummary === 'function') MartingaleUI.hideSummary();
+        const hadError = steps.some(function (s) { return s.indexOf('ERROR') >= 0 || s === 'ENGINE-MISSING'; });
+        MartingaleUI.update({
+          note: hadError
+            ? ('Đặt lại LỖI: ' + steps.join(' | ') + ' — chụp màn hình dòng này gửi dev')
+            : 'Đã đặt lại — chỉnh mức lệnh gốc rồi bấm Bắt đầu.'
+        });
         if (typeof MartingaleUI.setPhase === 'function') MartingaleUI.setPhase('IDLE'); // gọi CUỐI cùng
       }
-      log('Đặt lại: phiên cũ kết thúc, số dư đọc lại =', bal, '— chờ CEO nhập mức lệnh gốc mới.');
-    } catch (e) { warn('uiReset:', e); }
+    } catch (eTail) { warn('uiReset.tail:', eTail); }
+    log('Đặt lại:', steps.join(' | '), '| số dư =', balNow);
   }
+
 
   function uiStart(baseLevel) {
     try {

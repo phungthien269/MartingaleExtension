@@ -305,9 +305,9 @@
       try {
         const now = Date.now();
         if (now > resetArmed) {
-          resetArmed = now + 3000;
-          bReset.textContent = 'Bấm lần nữa để xác nhận';
-          setTimeout(function () { bReset.textContent = 'Đặt lại'; }, 3000);
+          resetArmed = now + 10000; // 10 giây — đủ thời gian đọc nhãn rồi bấm lại
+          bReset.textContent = 'Bấm lần nữa để xác nhận (10s)';
+          setTimeout(function () { bReset.textContent = 'Đặt lại'; }, 10000);
           return;
         }
         resetArmed = 0;
