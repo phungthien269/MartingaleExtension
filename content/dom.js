@@ -343,6 +343,8 @@
         return;
       }
 
+      armErrorGuard();
+
       btn.click();
       log('Đã bấm lệnh ' + s + ' với ' + amt + ' coin, chờ xác nhận...');
 
@@ -358,6 +360,48 @@
   }
 
   /** Nhập mức lệnh vào ô input (Vue) hoặc bấm nút nhanh khớp mức. */
+  /** Bảng lỗi của trang (vd "The minimum bet amount is 0.01") — tự bấm OK. */
+  let errGuardTimer = null;
+  function findErrDialog() {
+    const sels = ['[role="dialog"]', '[role="alertdialog"]', '[class*="modal" i]', '[class*="dialog" i]', '[class*="popup" i]'];
+    for (let i = 0; i < sels.length; i++) {
+      let els = [];
+      try { els = document.querySelectorAll(sels[i]); } catch (e) { continue; }
+      for (let j = 0; j < els.length; j++) {
+        let t = '';
+        try { t = String(els[j].textContent || '').toUpperCase(); } catch (e2) { continue; }
+        if (t.indexOf('MINIMUM BET') >= 0) return els[j];
+      }
+    }
+    return null;
+  }
+  function dismissErrDialog() {
+    const dlg = findErrDialog();
+    if (!dlg) return false;
+    let btns = [];
+    try { btns = dlg.querySelectorAll('button'); } catch (e0) { btns = []; }
+    for (let i = 0; i < btns.length; i++) {
+      let txt = '';
+      try { txt = String(btns[i].textContent || '').trim().toUpperCase(); } catch (e1) { continue; }
+      if (txt === 'OK') {
+        try { btns[i].click(); log('Đã tự bấm OK trên bảng lỗi lệnh tối thiểu.'); } catch (e2) { /* bỏ qua */ }
+        return true;
+      }
+    }
+    return true; // có bảng nhưng không thấy nút OK — vẫn báo đã xử lý để dừng quét
+  }
+  function armErrorGuard() {
+    try {
+      if (errGuardTimer) return;
+      let ticks = 0;
+      errGuardTimer = setInterval(function () {
+        ticks++;
+        const handled = dismissErrDialog();
+        if (handled || ticks >= 24) { clearInterval(errGuardTimer); errGuardTimer = null; }
+      }, 250);
+    } catch (e) { /* bỏ qua */ }
+  }
+
   function setBetAmount(amount) {
     let viaQuick = false;
     try {
@@ -378,18 +422,32 @@
     }
     if (!input) return viaQuick;
 
-    try {
-      input.focus();
-      const desc = Object.getOwnPropertyDescriptor(root.HTMLInputElement.prototype, 'value');
-      if (desc && desc.set) desc.set.call(input, String(amount));
-      else input.value = String(amount);
-      input.dispatchEvent(new Event('input', { bubbles: true }));
-      input.dispatchEvent(new Event('change', { bubbles: true }));
-      return true;
-    } catch (e) {
-      warn('Không set được ô mức lệnh:', e && e.message);
-      return viaQuick;
+    // GHI → ĐỌC LẠI → XÁC NHẬN (tối đa 5 lần): trang có thể (re)khởi tạo ô lệnh
+    // ngay sau khi ta ghi — đặc biệt ở vòng đầu sau Bắt đầu/Tiếp tục — và làm
+    // mất số vừa nhập. Bấm lệnh khi ô rỗng sẽ dính bảng "lệnh tối thiểu 0.01".
+    // Không giữ được số → CHỐI lệnh, tuyệt đối không bấm khi ô rỗng.
+    for (let attempt = 1; attempt <= 5; attempt++) {
+      try {
+        input.focus();
+        let desc = null;
+        try { desc = root.HTMLInputElement ? Object.getOwnPropertyDescriptor(root.HTMLInputElement.prototype, 'value') : null; } catch (eDesc) { desc = null; }
+        if (desc && desc.set) desc.set.call(input, String(amount));
+        else input.value = String(amount);
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+        input.dispatchEvent(new Event('change', { bubbles: true }));
+      } catch (e) {
+        warn('Không set được ô mức lệnh (lần ' + attempt + '):', e && e.message);
+      }
+      let got = NaN;
+      try { got = Math.round(Number(String(input.value).replace(/\s/g, '').replace(',', '.')) * 100) / 100; } catch (e2) { got = NaN; }
+      if (got === amount) return true;
+      if (attempt < 5) {
+        const until = Date.now() + 120;
+        while (Date.now() < until) { /* nhường trang kịp (re)khởi tạo ô lệnh */ }
+      }
     }
+    warn('Ô mức lệnh không giữ được số ' + amount + ' sau 5 lần thử — chối lệnh (tránh bảng "lệnh tối thiểu 0.01").');
+    return false;
   }
 
   /** Xác nhận lệnh đã vào bàn (nút --placed hoặc có lệnh pending). */

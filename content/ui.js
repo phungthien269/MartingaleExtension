@@ -150,6 +150,7 @@
       onStart: callbacks && callbacks.onStart,
       onPause: callbacks && callbacks.onPause,
       onResume: callbacks && callbacks.onResume,
+      onReset: callbacks && callbacks.onReset,
       onManualBalance: callbacks && callbacks.onManualBalance
     });
 
@@ -298,20 +299,10 @@
       }
     } catch (e0) { /* mock/env không có chrome.runtime */ }
 
-    // Xác nhận 2 lần bấm IN-PANEL — không dùng window.confirm vì trang có thể
-    // chặn hộp thoại (trả false IM LẶNG) khiến nút Đặt lại thành xác chết.
-    let resetArmed = 0;
+    // Đặt lại chạy NGAY khi bấm 1 lần (theo yêu cầu người dùng) — không dùng
+    // window.confirm vì trang có thể chặn hộp thoại (trả false im lặng).
     bReset.addEventListener('click', function () {
       try {
-        const now = Date.now();
-        if (now > resetArmed) {
-          resetArmed = now + 10000; // 10 giây — đủ thời gian đọc nhãn rồi bấm lại
-          bReset.textContent = 'Bấm lần nữa để xác nhận (10s)';
-          setTimeout(function () { bReset.textContent = 'Đặt lại'; }, 10000);
-          return;
-        }
-        resetArmed = 0;
-        bReset.textContent = 'Đặt lại';
         if (cb.onReset) cb.onReset();
         if (typeof hideSummary === 'function') hideSummary();
       } catch (e) { console.warn('[MartingaleUI] reset:', e); }
